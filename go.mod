@@ -1,4 +1,4 @@
-module gorm.io/driver/clickhouse
+module github.com/Servicewall/clickhouse
 
 go 1.21
 
