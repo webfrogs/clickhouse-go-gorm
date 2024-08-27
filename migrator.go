@@ -290,6 +290,15 @@ func (m Migrator) HasColumn(value interface{}, field string) bool {
 func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 	columnTypes := make([]gorm.ColumnType, 0)
 	execErr := m.RunWithValue(value, func(stmt *gorm.Statement) (err error) {
+		migrateColumns := ""
+		for _, dbName := range stmt.Schema.DBNames {
+			field := stmt.Schema.FieldsByDBName[dbName]
+			if !field.IgnoreMigration {
+				migrateColumns += dbName + ","
+			}
+		}
+		migrateColumns = migrateColumns[:len(migrateColumns)-1]
+
 		rows, err := m.DB.Session(&gorm.Session{}).Table(stmt.Table).Limit(1).Rows()
 		if err != nil {
 			return err
