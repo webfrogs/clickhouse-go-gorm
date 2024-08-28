@@ -290,7 +290,30 @@ func (m Migrator) HasColumn(value interface{}, field string) bool {
 func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 	columnTypes := make([]gorm.ColumnType, 0)
 	execErr := m.RunWithValue(value, func(stmt *gorm.Statement) (err error) {
-		rows, err := m.DB.Session(&gorm.Session{}).Table(stmt.Table).Limit(1).Rows()
+		ignoreMigrationMap := make(map[string]bool)
+		for _, dbName := range stmt.Schema.DBNames {
+			ignoreMigrationMap[dbName] = stmt.Schema.FieldsByDBName[dbName].IgnoreMigration
+		}
+
+		rows, err := m.DB.Raw("SELECT name FROM system.columns WHERE database = ? AND table = ?", m.CurrentDatabase(), stmt.Table).Rows()
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+
+		migrateColumns := ""
+		for rows.Next() {
+			var name string
+			if scanErr := rows.Scan(&name); scanErr != nil {
+				return scanErr
+			}
+			if !ignoreMigrationMap[name] {
+				migrateColumns += name + ","
+			}
+		}
+		migrateColumns = migrateColumns[:len(migrateColumns)-1]
+
+		rows, err = m.DB.Session(&gorm.Session{}).Table(stmt.Table).Select(migrateColumns).Limit(1).Rows()
 		if err != nil {
 			return err
 		}
