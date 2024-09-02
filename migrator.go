@@ -295,25 +295,27 @@ func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 			ignoreMigrationMap[dbName] = stmt.Schema.FieldsByDBName[dbName].IgnoreMigration
 		}
 
-		rows, err := m.DB.Raw("SELECT name FROM system.columns WHERE database = ? AND table = ?", m.CurrentDatabase(), stmt.Table).Rows()
+		columnNames, err := m.DB.Raw("SELECT name FROM system.columns WHERE database = ? AND table = ?", m.CurrentDatabase(), stmt.Table).Rows()
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
+		defer columnNames.Close()
 
 		migrateColumns := ""
-		for rows.Next() {
+		for columnNames.Next() {
 			var name string
-			if scanErr := rows.Scan(&name); scanErr != nil {
+			if scanErr := columnNames.Scan(&name); scanErr != nil {
 				return scanErr
 			}
 			if !ignoreMigrationMap[name] {
 				migrateColumns += name + ","
 			}
 		}
-		migrateColumns = migrateColumns[:len(migrateColumns)-1]
+		if len(migrateColumns) > 0 {
+			migrateColumns = migrateColumns[:len(migrateColumns)-1]
+		}
 
-		rows, err = m.DB.Session(&gorm.Session{}).Table(stmt.Table).Select(migrateColumns).Limit(1).Rows()
+		rows, err := m.DB.Session(&gorm.Session{}).Table(stmt.Table).Select(migrateColumns).Limit(1).Rows()
 		if err != nil {
 			return err
 		}
